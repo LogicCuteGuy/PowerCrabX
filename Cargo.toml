@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bedrockrs = {path = "../bedrock-rs", features = ["full"]}
+tokio = { version = "1.40", features = ["full"] }
+uuid = { version = "1.16.0", features = ["v4"] }
+vek = "0.17"
+nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }
+log4rs = "1.3.0"
