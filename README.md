@@ -1,6 +1,6 @@
 <p align="center">
     <a href="">
-      <img src=".github/img/PowerCrabX.png" width=35% alt="Chorus">
+      <img src=".github/img/PowerCrabX.png" width=30% alt="Chorus">
     </a>
     <p align="center">
         <strong>
