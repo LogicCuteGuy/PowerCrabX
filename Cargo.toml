@@ -10,3 +10,6 @@ uuid = { version = "1.16.0", features = ["v4"] }
 vek = "0.17"
 nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }
 log4rs = "1.3.0"
+log = "0.4.27"
+once_cell = "1.21.3"
+chrono = "0.4"
