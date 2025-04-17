@@ -57,7 +57,7 @@ impl BedrockSession {
         // self.connection.recv().await.unwrap();
         // println!("NetworkSettingsRequest");
 
-        let compression = Compression::Zlib { threshold: 1, compression_level: 9 };
+        let compression = Compression::Zlib { threshold: 1, compression_level: 7 };
 
         // NetworkSettings
         // self.connection.send(&[GamePackets::NetworkSettings(NetworkSettingsPacket {
@@ -299,7 +299,6 @@ impl BedrockSession {
 
         loop {
             let res = self.connection.recv().await;
-
             if let Ok(packet) = res {
                 println!("{:?}", packet);
             } else {
