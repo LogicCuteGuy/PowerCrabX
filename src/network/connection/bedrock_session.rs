@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use bedrockrs::proto::compression::Compression;
 use bedrockrs::proto::connection::Connection;
+use bedrockrs::proto::error::{ConnectionError, TransportLayerError};
+use bedrockrs::proto::error::ConnectionError::TransportError;
 use bedrockrs::proto::v662::enums::{BuildPlatform, ConnectionFailReason, Difficulty, Dimension, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType, PacketCompressionAlgorithm, PlayerPermissionLevel, ServerAuthMovementMode};
 use bedrockrs::proto::v662::packets::{LevelChunkPacket, NetworkSettingsPacket};
 use bedrockrs::proto::v662::types::{ActorRuntimeID, ActorUniqueID, GameRulesChangedPacketData, NetworkBlockPosition, SerializedSkin, SyncedPlayerMovementSettings};
@@ -36,16 +38,14 @@ impl BedrockSession {
     }
 
     pub async fn start(&mut self) {
-        loop {
-            let packet = self.connection.recv().await.unwrap();
-            for packet in packet.iter() {
-                match packet {
-                    GamePackets::RequestNetworkSettings(data) => {
-                        session_start::handle(&mut self.connection, data).await;
-                        self.handle_login().await;
-                    }
-                    _ => {}
+        let packet = self.connection.recv().await.unwrap();
+        for packet in packet.iter() {
+            match packet {
+                GamePackets::RequestNetworkSettings(data) => {
+                    session_start::handle(&mut self.connection, data).await;
+                    self.handle_login().await;
                 }
+                _ => {}
             }
         }
     }
@@ -299,10 +299,40 @@ impl BedrockSession {
 
         loop {
             let res = self.connection.recv().await;
+            
             if let Ok(packet) = res {
-                println!("{:?}", packet);
+                for (packet) in packet.iter() {
+                    match packet {
+                        GamePackets::PlayerAuthInput(data) => {
+                            // println!("PlayerAuthInput: {:?}", data);
+                        }
+                        _ => {
+                            println!("packet: {:?}", packet);
+                        }
+                    }
+                }
             } else {
-                println!("Error receiving packet: {:?}", res);
+                match res {
+                    Ok(_) => {}
+                    Err(err) => {
+                        match err {
+                            TransportError(err) => {
+                                match err {
+                                    TransportLayerError::RakNetError(_) => {
+                                        println!("close connection raknet closed");
+                                        break
+                                    }
+                                    _ => {
+                                        break
+                                    }
+                                }
+                            },
+                            ConnectionError::ProtoCodecError(_) | ConnectionError::ConnectionClosed | ConnectionError::IOError(_) => {
+                                break
+                            }
+                        }
+                    }
+                }
             }
         }
     }
