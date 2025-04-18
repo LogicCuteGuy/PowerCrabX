@@ -1,11 +1,19 @@
-use std::collections::HashMap;
+use crate::network::process::bedrock_session_handler::login_handler;
+use crate::network::process::bedrock_session_handler::session_start;
 use bedrockrs::proto::compression::Compression;
 use bedrockrs::proto::connection::Connection;
-use bedrockrs::proto::error::{ConnectionError, TransportLayerError};
 use bedrockrs::proto::error::ConnectionError::TransportError;
-use bedrockrs::proto::v662::enums::{BuildPlatform, ConnectionFailReason, Difficulty, Dimension, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType, PacketCompressionAlgorithm, PlayerPermissionLevel, ServerAuthMovementMode};
+use bedrockrs::proto::error::{ConnectionError, TransportLayerError};
+use bedrockrs::proto::v662::enums::{
+    BuildPlatform, ConnectionFailReason, Difficulty, Dimension, EditorWorldType,
+    EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType,
+    PacketCompressionAlgorithm, PlayerPermissionLevel, ServerAuthMovementMode,
+};
 use bedrockrs::proto::v662::packets::{LevelChunkPacket, NetworkSettingsPacket};
-use bedrockrs::proto::v662::types::{ActorRuntimeID, ActorUniqueID, GameRulesChangedPacketData, NetworkBlockPosition, SerializedSkin, SyncedPlayerMovementSettings};
+use bedrockrs::proto::v662::types::{
+    ActorRuntimeID, ActorUniqueID, GameRulesChangedPacketData, NetworkBlockPosition,
+    SerializedSkin, SyncedPlayerMovementSettings,
+};
 use bedrockrs::proto::v729::packets::play_status::PlayStatusPacket;
 use bedrockrs::proto::v729::types::base_game_version::BaseGameVersion;
 use bedrockrs::proto::v729::types::chat_restriction_level::ChatRestrictionLevel;
@@ -16,17 +24,21 @@ use bedrockrs::proto::v729::types::network_permissions::NetworkPermissions;
 use bedrockrs::proto::v729::types::play_status::PlayStatusType;
 use bedrockrs::proto::v729::types::spawn_biome_type::SpawnBiomeType;
 use bedrockrs::proto::v729::types::spawn_settings::SpawnSettings;
-use bedrockrs::proto::v748::packets::{AttributeData, DisconnectPacket, DisconnectPacketMessage, ResourcePackStackPacket, UpdateAttributesPacket};
+use bedrockrs::proto::v748::packets::{
+    AttributeData, DisconnectPacket, DisconnectPacketMessage, ResourcePackStackPacket,
+    UpdateAttributesPacket,
+};
 use bedrockrs::proto::v748::types::LevelSettings;
 use bedrockrs::proto::v766::enums::{AddPlayerListEntry, PlayerListPacketType};
 use bedrockrs::proto::v766::packets::{PlayerListPacket, ResourcePacksInfoPacket};
-use bedrockrs::proto::v785::gamepackets::GamePackets;
 use bedrockrs::proto::v776::packets::{CreativeContentPacket, ItemRegistryPacket, StartGamePacket};
+use bedrockrs::proto::v785::gamepackets::GamePackets;
 use bedrockrs::proto::v785::helper::ProtoHelperV785;
+use std::collections::HashMap;
+use bedrockrs::proto::ProtoHelper;
 use tokio::time::Instant;
 use uuid::Uuid;
 use vek::{Vec2, Vec3};
-use crate::network::process::bedrock_session_handler::session_start;
 
 pub struct BedrockSession {
     connection: Connection<ProtoHelperV785>,
@@ -38,16 +50,51 @@ impl BedrockSession {
     }
 
     pub async fn start(&mut self) {
-        let packet = self.connection.recv().await.unwrap();
-        for packet in packet.iter() {
-            match packet {
-                GamePackets::RequestNetworkSettings(data) => {
-                    session_start::handle(&mut self.connection, data).await;
-                    self.handle_login().await;
+        loop {
+            let res = self.connection.recv().await;
+
+            if let Ok(packet) = res {
+                for (packet) in packet.iter() {
+                    println!("{:?}", packet);
+                    match packet {
+                        GamePackets::RequestNetworkSettings(packet_data) => {
+                            session_start::handle(self, packet_data).await;
+                        }
+                        GamePackets::Login(packet_data) => {
+                            login_handler::handle(&mut self.connection, packet_data)
+                                .await
+                                .unwrap();
+                        }
+                        GamePackets::PlayerAuthInput(data) => {
+                            // println!("PlayerAuthInput: {:?}", data);
+                        }
+                        _ => {
+                            println!("packet: {:?}", packet);
+                        }
+                    }
                 }
-                _ => {}
+            } else {
+                println!("Connection closed: {:?}", res);
             }
         }
+    }
+
+    pub async fn set_compression(
+        &mut self,
+        compression: Compression,
+    ) {
+        self.connection.compression = Some(compression)
+    }
+
+    pub async fn close(&mut self) {
+        self.connection.close().await;
+    }
+
+    pub async fn send(
+        &mut self,
+        gamepackets: &[<ProtoHelperV785 as ProtoHelper>::GamePacketType], // Use ProtoHelperV785 instead of T
+    ) {
+        self.connection.send(gamepackets).await.expect("Err send gamepackets");
     }
 
     pub async fn handle_login(&mut self) {
@@ -57,7 +104,10 @@ impl BedrockSession {
         // self.connection.recv().await.unwrap();
         // println!("NetworkSettingsRequest");
 
-        let compression = Compression::Zlib { threshold: 1, compression_level: 7 };
+        let compression = Compression::Zlib {
+            threshold: 1,
+            compression_level: 7,
+        };
 
         // NetworkSettings
         // self.connection.send(&[GamePackets::NetworkSettings(NetworkSettingsPacket {
@@ -78,30 +128,31 @@ impl BedrockSession {
         // Login
         println!("Login data {:?}", login_data);
 
-        self.connection.send(&[
-            GamePackets::PlayStatus(PlayStatusPacket {
-                status: PlayStatusType::LoginSuccess,
-            }),
-            GamePackets::ResourcePacksInfo(ResourcePacksInfoPacket {
-                resource_pack_required: false,
-                has_addon_packs: false,
-                has_scripts: false,
-                world_template_uuid: Default::default(),
-                resource_packs: vec![],
-                world_template_version: "".to_string(),
-            }),
-            GamePackets::ResourcePackStack(ResourcePackStackPacket {
-                texture_pack_required: false,
-                addon_list: vec![],
-                base_game_version: BaseGameVersion(String::from("1.0")),
-                experiments: Experiments {
-                    experiments: vec![],
-                    ever_toggled: false,
-                },
-                texture_pack_list: vec![],
-                include_editor_packs: false,
-            }),
-        ])
+        self.connection
+            .send(&[
+                GamePackets::PlayStatus(PlayStatusPacket {
+                    status: PlayStatusType::LoginSuccess,
+                }),
+                GamePackets::ResourcePacksInfo(ResourcePacksInfoPacket {
+                    resource_pack_required: false,
+                    has_addon_packs: false,
+                    has_scripts: false,
+                    world_template_uuid: Default::default(),
+                    resource_packs: vec![],
+                    world_template_version: "".to_string(),
+                }),
+                GamePackets::ResourcePackStack(ResourcePackStackPacket {
+                    texture_pack_required: false,
+                    addon_list: vec![],
+                    base_game_version: BaseGameVersion(String::from("1.0")),
+                    experiments: Experiments {
+                        experiments: vec![],
+                        ever_toggled: false,
+                    },
+                    texture_pack_list: vec![],
+                    include_editor_packs: false,
+                }),
+            ])
             .await
             .unwrap();
         println!("PlayStatus (LoginSuccess)");
@@ -181,11 +232,7 @@ impl BedrockSession {
                 disable_player_interactions: false,
                 server_identifier: "".to_string(),
                 server_world_identifier: "".to_string(),
-                default_spawn_block_position: NetworkBlockPosition {
-                    x: 0,
-                    y: 0,
-                    z: 0,
-                },
+                default_spawn_block_position: NetworkBlockPosition { x: 0, y: 0, z: 0 },
                 is_exported_from_editor: false,
                 education_features_enabled: false,
                 rule_data: GameRulesChangedPacketData { rules_list: vec![] },
@@ -216,7 +263,9 @@ impl BedrockSession {
             is_trial: false,
             enable_item_stack_net_manager: false,
             server_block_type_registry_checksum: 0,
-            network_permissions: NetworkPermissions { server_auth_sound: false },
+            network_permissions: NetworkPermissions {
+                server_auth_sound: false,
+            },
             player_gamemode: Gamemode::Creative,
         };
 
@@ -225,19 +274,20 @@ impl BedrockSession {
         for name in login_data.iter() {
             match name {
                 GamePackets::Login(data) => {
-                    playerlist.push(AddPlayerListEntry {
-                        uuid: data.client_uuid,
-                        target_actor_id: ActorUniqueID(0),
-                        player_name: data.clone().username,
-                        xbl_xuid: "".to_string(),
-                        platform_chat_id: "".to_string(),
-                        build_platform: BuildPlatform::Google,
-                        serialized_skin: data.clone().skin,
-                        is_teacher: false,
-                        is_host: false,
-                        is_sub_client: false,
-                        is_trusted_skin: true,
-                    });
+                    // playerlist.push(AddPlayerListEntry {
+                    //     uuid: data.client_uuid,
+                    //     target_actor_id: ActorUniqueID(0),
+                    //     player_name: data.clone().username,
+                    //     xbl_xuid: "".to_string(),
+                    //     platform_chat_id: "".to_string(),
+                    //     build_platform: BuildPlatform::Google,
+                    //     serialized_skin: data.clone().skin,
+                    //     is_teacher: false,
+                    //     is_host: false,
+                    //     is_sub_client: false,
+                    //     is_trusted_skin: true,
+                    // });
+                    println!("Login: {:?}", data.connection_request.is_xbox_auth());
                 }
                 _ => {}
             }
@@ -255,16 +305,23 @@ impl BedrockSession {
             modifiers: Vec::new(),
         });
 
-        self.connection.send(&[
-            GamePackets::StartGame(packet1),
-            GamePackets::ItemRegistry(ItemRegistryPacket { items: vec![] }),
-            GamePackets::PlayerList(PlayerListPacket { action: PlayerListPacketType::Add { add_player_list: playerlist } }),
-            GamePackets::UpdateAttributes(UpdateAttributesPacket {
-                target_runtime_id: ActorRuntimeID(0),
-                attribute_list: att,
-                tick: 0,
-            }),
-        ]).await.unwrap();
+        self.connection
+            .send(&[
+                GamePackets::StartGame(packet1),
+                GamePackets::ItemRegistry(ItemRegistryPacket { items: vec![] }),
+                GamePackets::PlayerList(PlayerListPacket {
+                    action: PlayerListPacketType::Add {
+                        add_player_list: playerlist,
+                    },
+                }),
+                GamePackets::UpdateAttributes(UpdateAttributesPacket {
+                    target_runtime_id: ActorRuntimeID(0),
+                    attribute_list: att,
+                    tick: 0,
+                }),
+            ])
+            .await
+            .unwrap();
         println!("StartGame");
 
         let chunk_position_x = 0 >> 4;
@@ -273,7 +330,10 @@ impl BedrockSession {
         for x in -chunk_radius..chunk_radius {
             for z in -chunk_radius..chunk_radius {
                 let mut chunk = LevelChunkPacket {
-                    chunk_position: ChunkPos { x: 0 >> 4, z: 0 >> 4 },
+                    chunk_position: ChunkPos {
+                        x: 0 >> 4,
+                        z: 0 >> 4,
+                    },
                     dimension_id: 0,
                     cache_enabled: false,
                     cache_blobs: vec![],
@@ -281,16 +341,19 @@ impl BedrockSession {
                 };
                 chunk.chunk_position.x = chunk_position_x + x;
                 chunk.chunk_position.z = chunk_position_z + z;
-                self.connection.send(&[
-                    GamePackets::LevelChunk(chunk)
-                ]).await.unwrap();
+                self.connection
+                    .send(&[GamePackets::LevelChunk(chunk)])
+                    .await
+                    .unwrap();
             }
         }
 
-        self.connection.send(&[GamePackets::PlayStatus(PlayStatusPacket {
-            status: PlayStatusType::PlayerSpawn,
-        })])
-            .await.unwrap();
+        self.connection
+            .send(&[GamePackets::PlayStatus(PlayStatusPacket {
+                status: PlayStatusType::PlayerSpawn,
+            })])
+            .await
+            .unwrap();
         println!("PlayStatusPacket (PlayerSpawn)");
 
         let time_end = Instant::now();
@@ -299,7 +362,7 @@ impl BedrockSession {
 
         loop {
             let res = self.connection.recv().await;
-            
+
             if let Ok(packet) = res {
                 for (packet) in packet.iter() {
                     match packet {
@@ -314,24 +377,18 @@ impl BedrockSession {
             } else {
                 match res {
                     Ok(_) => {}
-                    Err(err) => {
-                        match err {
-                            TransportError(err) => {
-                                match err {
-                                    TransportLayerError::RakNetError(_) => {
-                                        println!("close connection raknet closed");
-                                        break
-                                    }
-                                    _ => {
-                                        break
-                                    }
-                                }
-                            },
-                            ConnectionError::ProtoCodecError(_) | ConnectionError::ConnectionClosed | ConnectionError::IOError(_) => {
-                                break
+                    Err(err) => match err {
+                        TransportError(err) => match err {
+                            TransportLayerError::RakNetError(_) => {
+                                println!("close connection raknet closed");
+                                break;
                             }
-                        }
-                    }
+                            _ => break,
+                        },
+                        ConnectionError::ProtoCodecError(_)
+                        | ConnectionError::ConnectionClosed
+                        | ConnectionError::IOError(_) => break,
+                    },
                 }
             }
         }
