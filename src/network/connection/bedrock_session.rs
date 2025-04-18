@@ -2,17 +2,18 @@ use crate::network::process::bedrock_session_handler::login_handler;
 use crate::network::process::bedrock_session_handler::session_start;
 use bedrockrs::proto::compression::Compression;
 use bedrockrs::proto::connection::Connection;
+use bedrockrs::proto::encryption::Encryption;
 use bedrockrs::proto::error::ConnectionError::TransportError;
 use bedrockrs::proto::error::{ConnectionError, TransportLayerError};
 use bedrockrs::proto::v662::enums::{
-    BuildPlatform, ConnectionFailReason, Difficulty, Dimension, EditorWorldType,
-    EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType,
-    PacketCompressionAlgorithm, PlayerPermissionLevel, ServerAuthMovementMode,
+    Difficulty, Dimension, EditorWorldType,
+    EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType
+    , PlayerPermissionLevel, ServerAuthMovementMode,
 };
-use bedrockrs::proto::v662::packets::{LevelChunkPacket, NetworkSettingsPacket};
+use bedrockrs::proto::v662::packets::LevelChunkPacket;
 use bedrockrs::proto::v662::types::{
-    ActorRuntimeID, ActorUniqueID, GameRulesChangedPacketData, NetworkBlockPosition,
-    SerializedSkin, SyncedPlayerMovementSettings,
+    ActorRuntimeID, ActorUniqueID, GameRulesChangedPacketData, NetworkBlockPosition
+    , SyncedPlayerMovementSettings,
 };
 use bedrockrs::proto::v729::packets::play_status::PlayStatusPacket;
 use bedrockrs::proto::v729::types::base_game_version::BaseGameVersion;
@@ -25,18 +26,17 @@ use bedrockrs::proto::v729::types::play_status::PlayStatusType;
 use bedrockrs::proto::v729::types::spawn_biome_type::SpawnBiomeType;
 use bedrockrs::proto::v729::types::spawn_settings::SpawnSettings;
 use bedrockrs::proto::v748::packets::{
-    AttributeData, DisconnectPacket, DisconnectPacketMessage, ResourcePackStackPacket,
+    AttributeData, ResourcePackStackPacket,
     UpdateAttributesPacket,
 };
 use bedrockrs::proto::v748::types::LevelSettings;
-use bedrockrs::proto::v766::enums::{AddPlayerListEntry, PlayerListPacketType};
+use bedrockrs::proto::v766::enums::PlayerListPacketType;
 use bedrockrs::proto::v766::packets::{PlayerListPacket, ResourcePacksInfoPacket};
-use bedrockrs::proto::v776::packets::{CreativeContentPacket, ItemRegistryPacket, StartGamePacket};
+use bedrockrs::proto::v776::packets::{ItemRegistryPacket, StartGamePacket};
 use bedrockrs::proto::v785::gamepackets::GamePackets;
 use bedrockrs::proto::v785::helper::ProtoHelperV785;
-use std::collections::HashMap;
-use bedrockrs::proto::encryption::Encryption;
 use bedrockrs::proto::ProtoHelper;
+use std::collections::HashMap;
 use tokio::time::Instant;
 use uuid::Uuid;
 use vek::{Vec2, Vec3};
@@ -98,6 +98,7 @@ impl BedrockSession {
                 }
             } else {
                 println!("Connection closed: {:?}", res);
+                break
             }
         }
     }

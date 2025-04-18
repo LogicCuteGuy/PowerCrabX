@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::network::connection::bedrock_session::BedrockSession;
 use bedrockrs::proto::encryption::Encryption;
 use bedrockrs::proto::v662::enums::{ConnectionFailReason, Difficulty, Dimension, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, Gamemode, GeneratorType, PlayerPermissionLevel, ServerAuthMovementMode};
@@ -15,24 +14,20 @@ use bedrockrs::proto::v729::types::network_permissions::NetworkPermissions;
 use bedrockrs::proto::v729::types::play_status::PlayStatusType;
 use bedrockrs::proto::v729::types::spawn_biome_type::SpawnBiomeType;
 use bedrockrs::proto::v729::types::spawn_settings::SpawnSettings;
-use bedrockrs::proto::v748::packets::{DisconnectPacket, DisconnectPacketMessage, ResourcePackStackPacket, UpdateAttributesPacket};
+use bedrockrs::proto::v748::packets::{DisconnectPacket, DisconnectPacketMessage, ResourcePackStackPacket};
 use bedrockrs::proto::v748::types::LevelSettings;
-use bedrockrs::proto::v766::enums::PlayerListPacketType;
-use bedrockrs::proto::v766::packets::{PlayerListPacket, ResourcePacksInfoPacket};
+use bedrockrs::proto::v766::packets::ResourcePacksInfoPacket;
 use bedrockrs::proto::v776::packets::{ItemRegistryPacket, StartGamePacket};
 use bedrockrs::proto::v785::gamepackets::GamePackets;
-use p384::ecdsa::SigningKey;
-use rand_core::OsRng;
+use std::collections::HashMap;
 use uuid::Uuid;
 use vek::{Vec2, Vec3};
 
 pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket) {
     let chain_data = &packet_data.connection_request;
-    // println!("ChainData: {:?}", chain_data);
     //mock
     let must_xbox = true;
     if (!chain_data.is_xbox_auth() && must_xbox) {
-        println!("xbox");
         session.send(&[
             GamePackets::PlayStatus(PlayStatusPacket {
                 status: PlayStatusType::LoginSuccess
@@ -62,7 +57,6 @@ pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket)
     let secret_key = Encryption::get_secret_key(&encryption_secret, &client_key.unwrap(), &token);
 
     let jwt = Encryption::create_handshake_jwt(&encryption_secret, &token).unwrap();
-    println!("jwt: {:?}", jwt);
     session.send(&[
         GamePackets::ServerToClientHandshake(ServerToClientHandshakePacket {
             handshake_web_token: jwt.clone(),
@@ -95,7 +89,7 @@ pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket)
             }),
         ])
         .await;
-    println!("send {:?}", jwt);
+    println!("send test");
     //
     let packet1 = StartGamePacket {
         target_actor_id: ActorUniqueID(0),
