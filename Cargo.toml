@@ -13,3 +13,8 @@ log4rs = "1.3.0"
 log = "0.4.27"
 once_cell = "1.21.3"
 chrono = "0.4"
+elliptic-curve = "0.13.8"
+sec1 = "0.7.3"
+p384 = { version = "0.13", features = ["pkcs8"] }
+rand_core = "0.6.4"
+serde = { version = "1.0.219", features = ["derive"] }

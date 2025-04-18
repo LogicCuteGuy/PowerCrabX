@@ -40,8 +40,8 @@ pub async fn handle(mut session: &mut BedrockSession, data: &RequestNetworkSetti
         .await;
 
     let compression = Compression::Zlib {
-        threshold: 1,
-        compression_level: 7,
+        threshold: 256,
+        compression_level: 6,
     };
 
     session.set_compression(compression).await;

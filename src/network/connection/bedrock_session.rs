@@ -55,18 +55,40 @@ impl BedrockSession {
 
             if let Ok(packet) = res {
                 for (packet) in packet.iter() {
-                    println!("{:?}", packet);
                     match packet {
                         GamePackets::RequestNetworkSettings(packet_data) => {
                             session_start::handle(self, packet_data).await;
                         }
                         GamePackets::Login(packet_data) => {
-                            login_handler::handle(&mut self.connection, packet_data)
-                                .await
-                                .unwrap();
+                            login_handler::handle(self, packet_data).await;
                         }
                         GamePackets::PlayerAuthInput(data) => {
                             // println!("PlayerAuthInput: {:?}", data);
+                        }
+                        GamePackets::ClientToServerHandshake(_) => {
+                            println!("ClientToServerHandshake");
+                            self.send(&[GamePackets::PlayStatus(PlayStatusPacket {
+                                status: PlayStatusType::LoginSuccess,
+                            }),
+                                GamePackets::ResourcePacksInfo(ResourcePacksInfoPacket {
+                                    resource_pack_required: false,
+                                    has_addon_packs: false,
+                                    has_scripts: false,
+                                    world_template_uuid: Default::default(),
+                                    resource_packs: vec![],
+                                    world_template_version: "".to_string(),
+                                }),
+                                GamePackets::ResourcePackStack(ResourcePackStackPacket {
+                                    texture_pack_required: false,
+                                    addon_list: vec![],
+                                    base_game_version: BaseGameVersion(String::from("1.0")),
+                                    experiments: Experiments {
+                                        experiments: vec![],
+                                        ever_toggled: false,
+                                    },
+                                    texture_pack_list: vec![],
+                                    include_editor_packs: false,
+                                })]).await;
                         }
                         _ => {
                             println!("packet: {:?}", packet);

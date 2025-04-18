@@ -35,7 +35,6 @@ impl Network {
                     println!("spawn Task");
                     let mut bedrock_session = BedrockSession::new(conn);
                     bedrock_session.start().await;
-                    // handle_login(conn).await;
                 });
             }
         });
