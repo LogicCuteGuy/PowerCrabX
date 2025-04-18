@@ -28,10 +28,11 @@ use vek::{Vec2, Vec3};
 
 pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket) {
     let chain_data = &packet_data.connection_request;
-    println!("ChainData: {:?}", chain_data);
+    // println!("ChainData: {:?}", chain_data);
     //mock
     let must_xbox = true;
     if (!chain_data.is_xbox_auth() && must_xbox) {
+        println!("xbox");
         session.send(&[
             GamePackets::PlayStatus(PlayStatusPacket {
                 status: PlayStatusType::LoginSuccess
@@ -60,15 +61,15 @@ pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket)
     // Derive secret key for encryption
     let secret_key = Encryption::get_secret_key(&encryption_secret, &client_key.unwrap(), &token);
 
-    // Create handshake JWT
-    let signing_key = SigningKey::random(&mut OsRng);
-    let jwt = Encryption::create_handshake_jwt(&signing_key, &token).unwrap();
+    let jwt = Encryption::create_handshake_jwt(&encryption_secret, &token).unwrap();
     println!("jwt: {:?}", jwt);
-    // session.send(&[
-    //     GamePackets::ServerToClientHandshake(ServerToClientHandshakePacket {
-    //         handshake_web_token: jwt.clone(),
-    //     })
-    // ]).await;
+    session.send(&[
+        GamePackets::ServerToClientHandshake(ServerToClientHandshakePacket {
+            handshake_web_token: jwt.clone(),
+        })
+    ]).await;
+    session.set_encryption(Encryption::fake_gcm(&secret_key)).await;
+
     session.send(&[
             GamePackets::PlayStatus(PlayStatusPacket {
                 status: PlayStatusType::LoginSuccess,
@@ -95,7 +96,7 @@ pub async fn handle(mut session: &mut BedrockSession, packet_data: &LoginPacket)
         ])
         .await;
     println!("send {:?}", jwt);
-
+    //
     let packet1 = StartGamePacket {
         target_actor_id: ActorUniqueID(0),
         target_runtime_id: ActorRuntimeID(0),

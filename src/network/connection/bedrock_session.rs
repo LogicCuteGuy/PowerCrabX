@@ -35,6 +35,7 @@ use bedrockrs::proto::v776::packets::{CreativeContentPacket, ItemRegistryPacket,
 use bedrockrs::proto::v785::gamepackets::GamePackets;
 use bedrockrs::proto::v785::helper::ProtoHelperV785;
 use std::collections::HashMap;
+use bedrockrs::proto::encryption::Encryption;
 use bedrockrs::proto::ProtoHelper;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -105,7 +106,16 @@ impl BedrockSession {
         &mut self,
         compression: Compression,
     ) {
+
         self.connection.compression = Some(compression)
+    }
+
+    pub async fn set_encryption(
+        &mut self,
+        encryption: Encryption,
+    ) {
+
+        self.connection.encryption = Some(encryption)
     }
 
     pub async fn close(&mut self) {
