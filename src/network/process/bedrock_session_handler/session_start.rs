@@ -8,11 +8,11 @@ use bedrockrs::proto::v729::types::play_status::PlayStatusType;
 use bedrockrs::proto::v748::packets::{DisconnectPacket, DisconnectPacketMessage};
 use bedrockrs::proto::v785::gamepackets::GamePackets;
 use bedrockrs::proto::v785::helper::ProtoHelperV785;
-use crate::network::connection::bedrock_session::BedrockSession;
+use crate::network::connection::bedrock_session::{BedrockSession, SessionState};
 use crate::network::protocol_info::CURRENT_PROTOCOL;
 
-pub async fn handle(mut session: &mut BedrockSession, data: &RequestNetworkSettingsPacket) {
-    let protocol = data.client_network_version;
+pub async fn handle(mut session: &mut BedrockSession, packet_data: &RequestNetworkSettingsPacket) {
+    let protocol = packet_data.client_network_version;
     if (protocol != CURRENT_PROTOCOL) {
         let message = if protocol < CURRENT_PROTOCOL {"disconnectionScreen.outdatedClient"} else {"disconnectionScreen.outdatedServer"};
         let status = if protocol < CURRENT_PROTOCOL {PlayStatusType::FailedClientOld} else {PlayStatusType::FailedServerOld};
@@ -46,4 +46,5 @@ pub async fn handle(mut session: &mut BedrockSession, data: &RequestNetworkSetti
 
     session.set_compression(compression).await;
     println!("NetworkSettings");
+    session.change_state(SessionState::Login);
 }

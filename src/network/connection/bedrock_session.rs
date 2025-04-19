@@ -1,5 +1,6 @@
-use crate::network::process::bedrock_session_handler::login_handler;
+use crate::network::process::bedrock_session_handler::{login_handler, resource_pack_chunk_request_handler, resource_pack_handler};
 use crate::network::process::bedrock_session_handler::session_start;
+use crate::network::process::bedrock_session_handler::client_to_server_handler;
 use bedrockrs::proto::compression::Compression;
 use bedrockrs::proto::connection::Connection;
 use bedrockrs::proto::encryption::Encryption;
@@ -41,13 +42,30 @@ use tokio::time::Instant;
 use uuid::Uuid;
 use vek::{Vec2, Vec3};
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum SessionState {
+    Start,
+    Login,
+    Encryption,
+    ResourcePack,
+    PreSpawn,
+    InGame,
+    Death
+}
+
 pub struct BedrockSession {
     connection: Connection<ProtoHelperV785>,
+    state: SessionState
 }
 
 impl BedrockSession {
     pub fn new(connection: Connection<ProtoHelperV785>) -> BedrockSession {
-        BedrockSession { connection }
+        BedrockSession { connection, state: SessionState::Start }
+    }
+
+    pub fn change_state(&mut self, new_state: SessionState) {
+        println!("Transitioning from {:?} to {:?}", self.state, new_state);
+        self.state = new_state;
     }
 
     pub async fn start(&mut self) {
@@ -56,43 +74,29 @@ impl BedrockSession {
 
             if let Ok(packet) = res {
                 for (packet) in packet.iter() {
-                    match packet {
-                        GamePackets::RequestNetworkSettings(packet_data) => {
+                    match (self.state, packet) {
+                        (SessionState::Start, GamePackets::RequestNetworkSettings(packet_data)) => {
                             session_start::handle(self, packet_data).await;
                         }
-                        GamePackets::Login(packet_data) => {
+                        (SessionState::Login, GamePackets::Login(packet_data)) => {
                             login_handler::handle(self, packet_data).await;
                         }
-                        GamePackets::PlayerAuthInput(data) => {
+                        (SessionState::InGame, GamePackets::PlayerAuthInput(data)) => {
                             // println!("PlayerAuthInput: {:?}", data);
                         }
-                        GamePackets::ClientToServerHandshake(_) => {
+                        (SessionState::Encryption, GamePackets::ClientToServerHandshake(packet_data)) => {
                             println!("ClientToServerHandshake");
-                            self.send(&[GamePackets::PlayStatus(PlayStatusPacket {
-                                status: PlayStatusType::LoginSuccess,
-                            }),
-                                GamePackets::ResourcePacksInfo(ResourcePacksInfoPacket {
-                                    resource_pack_required: false,
-                                    has_addon_packs: false,
-                                    has_scripts: false,
-                                    world_template_uuid: Default::default(),
-                                    resource_packs: vec![],
-                                    world_template_version: "".to_string(),
-                                }),
-                                GamePackets::ResourcePackStack(ResourcePackStackPacket {
-                                    texture_pack_required: false,
-                                    addon_list: vec![],
-                                    base_game_version: BaseGameVersion(String::from("1.0")),
-                                    experiments: Experiments {
-                                        experiments: vec![],
-                                        ever_toggled: false,
-                                    },
-                                    texture_pack_list: vec![],
-                                    include_editor_packs: false,
-                                })]).await;
+                            client_to_server_handler::handle(self, packet_data).await;
                         }
-                        _ => {
-                            println!("packet: {:?}", packet);
+                        (SessionState::ResourcePack, GamePackets::ResourcePackClientResponse(packet_data)) => {
+                            println!("packet_data {:?}", packet_data);
+                            resource_pack_handler::handle(self, packet_data).await;
+                        }
+                        (SessionState::ResourcePack, GamePackets::ResourcePackChunkRequest(packet_data)) => {
+                            resource_pack_chunk_request_handler::handle(self, packet_data).await;
+                        }
+                        (_, packet) => {
+                            println!("packet {:?} in state {:?}", packet, self.state);
                         }
                     }
                 }

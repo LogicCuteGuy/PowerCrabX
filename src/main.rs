@@ -3,6 +3,7 @@ mod level;
 mod server;
 mod utils;
 mod network;
+mod resource_pack;
 
 use std::collections::HashMap;
 use std::env;
@@ -10,6 +11,8 @@ use std::ops::Deref;
 use std::process::exit;
 use std::sync::Arc;
 use std::thread::spawn;
+use bedrockrs::addon::Addon;
+use bedrockrs::addon::resource::ResourcePack;
 use bedrockrs::proto::connection::Connection;
 use bedrockrs::proto::listener::Listener;
 use bedrockrs::proto::compression::Compression;
@@ -85,6 +88,7 @@ fn main() {
         if *TITLE.lock().await {
             info!("Starting PowerCrabX...")
         }
+
         let server = Arc::new(Mutex::new(Server::default()));
 
         Network::new(server.lock().await).await;
